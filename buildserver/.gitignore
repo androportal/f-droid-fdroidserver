@@ -1,0 +1,4 @@
+.vagrant
+up.log
+cache/
+Vagrantfile

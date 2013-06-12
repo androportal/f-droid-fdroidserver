@@ -1,0 +1,43 @@
+@numchapentry{Overview}{1}{Overview}{1}
+@numchapentry{System Requirements}{2}{System Requirements}{2}
+@numchapentry{Setup}{3}{Setup}{3}
+@numsecentry{Data}{3.1}{}{3}
+@numchapentry{Simple Binary Repository}{4}{Simple Binary Repository}{4}
+@numchapentry{Building Applications}{5}{Building Applications}{5}
+@numsecentry{More about "fdroid build"}{5.1}{}{5}
+@numsecentry{Direct Installation}{5.2}{}{6}
+@numchapentry{Importing Applications}{6}{Importing Applications}{7}
+@numchapentry{Metadata}{7}{Metadata}{8}
+@numsecentry{Category}{7.1}{Category}{8}
+@numsecentry{License}{7.2}{License}{8}
+@numsecentry{Name}{7.3}{Name}{9}
+@numsecentry{Web Site}{7.4}{Web Site}{9}
+@numsecentry{Source Code}{7.5}{Source Code}{9}
+@numsecentry{Issue Tracker}{7.6}{Issue Tracker}{9}
+@numsecentry{Donate}{7.7}{Donate}{9}
+@numsecentry{FlattrID}{7.8}{FlattrID}{9}
+@numsecentry{Bitcoin}{7.9}{Bitcoin}{9}
+@numsecentry{Summary}{7.10}{Summary}{9}
+@numsecentry{Description}{7.11}{Description}{9}
+@numsecentry{Repo Type}{7.12}{Repo Type}{10}
+@numsecentry{Repo}{7.13}{Repo}{10}
+@numsecentry{Build Version}{7.14}{Build Version}{10}
+@numsecentry{AntiFeatures}{7.15}{AntiFeatures}{14}
+@numsecentry{Disabled}{7.16}{Disabled}{14}
+@numsecentry{Requires Root}{7.17}{Requires Root}{14}
+@numsecentry{Update Check Mode}{7.18}{Update Check Mode}{14}
+@numsecentry{Auto Update Mode}{7.19}{Auto Update Mode}{15}
+@numsecentry{Current Version}{7.20}{Current Version}{15}
+@numsecentry{Current Version Code}{7.21}{Current Version Code}{15}
+@numsecentry{No Source Since}{7.22}{No Source Since}{15}
+@numchapentry{Update Processing}{8}{Update Processing}{17}
+@numsecentry{Detecting}{8.1}{}{17}
+@numsecentry{Adding}{8.2}{}{17}
+@numchapentry{Build Server}{9}{Build Server}{18}
+@numsecentry{Overview}{9.1}{}{18}
+@numsecentry{Setting up a build server}{9.2}{}{18}
+@numchapentry{Signing}{10}{Signing}{20}
+@numsecentry{Repo Index Signing}{10.1}{}{20}
+@numsecentry{Package Signing}{10.2}{}{20}
+@appentry{GNU Free Documentation License}{A}{GNU Free Documentation License}{21}
+@unnchapentry{Index}{10001}{Index}{28}

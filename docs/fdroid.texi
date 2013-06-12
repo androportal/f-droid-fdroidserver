@@ -1,0 +1,1240 @@
+\input texinfo   @c -*-texinfo-*-
+@c %**start of header
+@setfilename fdroid.info
+@settitle F-Droid Server Manual
+@c %**end of header
+
+@copying
+This manual is for the F-Droid repository server tools.
+
+Copyright @copyright{} 2010, 2011, 2012, 2013 Ciaran Gultnieks
+Copyright @copyright{} 2011 Henrik Tunedal, Michael Haas, John Sullivan
+
+@quotation
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.3
+or any later version published by the Free Software Foundation;
+with no Invariant Sections, no Front-Cover Texts, and no Back-Cover Texts.
+A copy of the license is included in the section entitled "GNU
+Free Documentation License".
+@end quotation
+@end copying
+
+@titlepage
+@title F-Droid Server Manual
+@author Ciaran Gultnieks and the F-Droid project
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top F-Droid Server
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Overview::
+* System Requirements::
+* Setup::
+* Simple Binary Repository::
+* Building Applications::
+* Importing Applications::
+* Metadata::
+* Update Processing::
+* Build Server::
+* Signing::
+* GNU Free Documentation License::
+* Index::
+@end menu
+
+@node Overview
+@chapter Overview
+
+The F-Droid server tools provide various scripts and tools that are used
+to maintain the main F-Droid application repository. You can use these same
+tools to create your own additional or alternative repository for publishing,
+or to assist in creating, testing and submitting metadata to the main
+repository.
+
+
+@node System Requirements
+@chapter System Requirements
+
+@cindex installation
+
+The system requirements for using the tools will vary depending on your
+intended usage. At the very least, you'll need:
+
+@itemize @bullet
+@item
+GNU/Linux
+@item
+Python 2.x
+@item
+The Android SDK
+@end itemize
+
+If you intend to build applications from source you'll also need most, if not
+all, of the following:
+
+@itemize @bullet
+@item
+All available SDK platforms and tools installed in the Android SDK, but *not*
+the proprietary components.
+@item
+The Android NDK
+@item
+Ant
+@item
+Ant Contrib Tasks (Debian package ant-contrib)
+@item
+Maven (Debian package maven2)
+@item
+JavaCC (Debian package javacc)
+@item
+JDK (Debian package openjdk-6-jdk)
+@item
+VCS clients: svn, git, git-svn, hg, bzr
+@item
+A keystore for holding release keys. (Safe, secure and well backed up!)
+@end itemize
+
+If you intend to use the 'Build Server' system, for secure and clean builds
+(highly recommended), you will also need:
+
+@itemize @bullet
+@item
+VirtualBox (debian package virtualbox-ose)
+@item
+Ruby (debian packages ruby and rubygems)
+@item
+Vagrant (gem install vagrant)
+@item
+Paramiko (debian package python-paramiko)
+@end itemize
+
+
+@node Setup
+@chapter Setup
+
+@cindex setup, installation
+
+Because the tools and data will always change rapidly, you will almost
+certainly want to work from a git clone of the tools at this stage. To
+get started:
+
+@example
+git clone git://gitorious.org/f-droid/fdroidserver.git
+@end example
+
+You now have lots of stuff in the fdroidserver directory, but the most
+important is the 'fdroid' command script which you run to perform all tasks.
+This script is always run from a repository data directory, so the
+most sensible thing to do next is to put your new fdroidserver directory
+in your @code{PATH}.
+
+@section Data
+
+To do anything, you'll need at least one repository data directory. It's
+from this directory that you run the @code{fdroid} command to perform all
+repository management tasks. You can either create a brand new one, or
+grab a copy of the data used by the main F-Droid repository:
+
+@example
+git clone git://gitorious.org/f-droid/fdroiddata.git
+@end example
+
+Regardless of the intended usage of the tools, you will always need to set
+up some basic configuration details. This is done by creating a file called
+@code{config.py} in the data directory. You should do this by copying the
+example file (@code{config.sample.py}) from the fdroidserver project to your
+data directory and then editing according to the instructions within.
+
+Once configured in this way, all the functionality of the tools is accessed
+by running the @code{fdroid} command. Run it on its own to get a list of the
+available sub-commands.
+
+You can follow any command with @code{--help} to get a list of additional
+options available for that command.
+
+@example
+fdroid update --help
+@end example
+
+
+@node Simple Binary Repository
+@chapter Simple Binary Repository
+
+@cindex binary
+
+If you want to maintain a simple repository hosting only binary APKs obtained
+and compiled elsewhere, the process is quite simple:
+
+@enumerate
+@item
+Set up the server tools, as described in Setup.
+@item
+Make a directory for your repository. This is the directory from which you
+will do all the work with your repository. Create a config file there, called
+@code{config.py}, by copying the @code{config.sample.py} from the server
+project and editing it.
+@item
+Within that, make a directory called @code{repo} and put APK files in it.
+@item
+Run @code{fdroid update}.
+@item
+If it reports that any metadata files are missing, you can create them
+in the @code{metadata} directory and run it again.
+@item
+To ease creation of metadata files, run @code{fdroid update} with the @code{-c}
+option. It will create 'skeleton' metadata files that are missing, and you can
+then just edit them and fill in the details.
+@item
+Then, if you've changed things, run @code{fdroid update} again.
+@item
+Running @code{fdroid update} adds an Icons directory into the repo directory,
+and also creates the repository index (index.xml, and also index.jar if you've
+configured the system to use a signed index).
+@item
+Publish the resulting contents of the @code{repo} directory to your web server.
+@end enumerate
+
+Following the above process will result in a @code{repo} directory, which you
+simply need to push to any HTTP (or preferably HTTPS) server to make it
+accessible.
+
+While some information about the applications (and versions thereof) is
+retrieved directly from the APK files, most comes from the corresponding file
+in the @code{metadata} directory. The metadata file covering ALL versions of a
+particular application is named @code{package.id.txt} where package.id is the
+unique identifier for that package.
+
+See the Metadata chapter for details of what goes in the metadata file. All
+fields are relevant for binary APKs, EXCEPT for 'Build Version' entries, which
+should be omitted.
+
+
+@node Building Applications
+@chapter Building Applications
+
+Instead of (or as well as) including binary APKs from external sources in a
+repository, you can build them directly from the source code.
+
+Using this method, it is is possible to verify that the application builds
+correctly, corresponds to the source code, and contains only free software.
+Unforunately, in the Android world, it seems to be very common for an
+application supplied as a binary APK to present itself as Free Software
+when in fact some or all of the following are true:
+
+@enumerate
+@item
+The source code (either for a particular version, or even all versions!) is
+unavailable or incomplete.
+@item
+The source code is not capable of producing the actual binary supplied.
+@item
+The 'source code' contains binary files of unknown origin, or with proprietary
+licenses.
+@end enumerate
+
+For this reason, source-built applications are the preferred method for the
+main F-Droid repository, although occasionally for technical or historical
+reasons, exceptions are made to this policy.
+
+When building applications from source, it should be noted that you will be
+signing them (all APK files must be signed to be installable on Android) with
+your own key. When an application is already installed on a device, it is not
+possible to upgrade it in place to a new version signed with a different key
+without first uninstalling the original. This may present an inconvenience to
+users, as the process of uninstalling loses any data associated with the
+previous installation.
+
+The process for managing a repository for built-from-source applications is
+very similar to that described in the Simple Binary Repository chapter,
+except now you need to:
+
+@enumerate
+@item
+Include Build Version entries in the metadata files.
+@item
+Run @code{fdroid build} to build any applications that are not already built.
+@item
+Run @code{fdroid publish} to finalise packaging and sign any APKs that have
+been built.
+@end enumerate
+
+
+@section More about "fdroid build"
+
+When run without any parameters, @code{fdroid build} will build any and all
+versions of applications that you don't already have in the @code{repo}
+directory (or more accurately, the @code{unsigned} directory). There are various
+other things you can do. As with all the tools, the @code{--help} option is
+your friend, but a few annotated examples and discussion of the more common
+usage modes follows:
+
+To build a single version of a single application, you could run the
+following:
+
+@example
+./fdroid build --package=org.fdroid.fdroid --vercode 16
+@end example
+
+This attempts to build version code 16 (which is version 0.25) of the F-Droid
+client. Many of the tools recognise this @code{--package} parameter, allowing
+their activity to be limited to just a single package.
+
+If the build above was succesful, two files will have been placed in the
+@code{unsigned} directory:
+
+@example
+org.fdroid.fdroid_16.apk
+org.fdroid.fdroid_16_src.tar.gz
+@end example
+
+The first is the (unsigned) APK. You could sign this with a debug key and push
+it direct to your device or an emulator for testing. The second is a source
+tarball containing exactly the source that was used to generate the binary.
+
+If you were intending to publish these files, you could then run:
+
+@example
+./fdroid publish
+@end example
+
+The source tarball would move to the @code{repo} directory (which is the
+directory you would push to your web server). A signed and zip-aligned version
+of the APK would also appear there, and both files would be removed from the
+@code{unsigned} directory.
+
+If you're building purely for the purposes of testing, and not intending to
+push the results to a repository, at least yet, the @code{--test} option can be
+used to direct output to the @code{tmp} directory instead of @code{unsigned}.
+A similar effect could by achieved by simply deleting the output files from
+@code{unsigned} after the build, but with the risk of forgetting to do so!
+
+Along similar lines (and only in conjunction with @code{--test}, you can use
+@code{--force} to force a build of a Disabled application for test purposes,
+where normally it would be completely ignored.
+
+
+@section Direct Installation
+
+You can also build and install directly to a connected device or emulator using
+the @code{--install} switch. If you do this without using @code{--package} and
+@code{--vercode} then all versions of all packages will be installed (with each
+individual version overwriting the previous!). In most cases, this will not be
+what you want to do, so execution will stop straight away. However, you can
+override this if you're sure that's what you want, by using @code{--all}.
+
+
+@node Importing Applications
+@chapter Importing Applications
+
+To help with starting work on including a new application, @code{fdroid import}
+will take a URL and optionally some other parameters, and attempt to construct
+as much information as possible by analysing the source code. Basic usage is:
+
+@example
+./fdroid import --url=http://address.of.project
+@end example
+
+For this to work, the URL must point to a project format that the script
+understands. Currently this is limited to one of the following:
+
+@enumerate
+@item
+Gitorious - @code{https://gitorious.org/PROJECTNAME/REPONAME}
+@item
+Github - @code{https://github.com/USER/PROJECT}
+@item
+Google Code - @code{http://code.google.com/p/PROJECT/}
+Supports git, svn and hg repos.
+
+Some Google Code projects have multiple repositories, identified by a
+dropdown list on the @code{source/checkout} page. To access one other than
+the default, specify its name using the @code{--repo} switch.
+@item
+Bitbucket - @code{https://bitbucket.org/USER/PROJECT/}
+@item
+Git - @code{git://REPO}
+@end enumerate
+
+Depending on the project type, more or less information may be gathered. For
+example, the license will be retrieved from a Google Code project, but not a
+GitHub one. A bare repo url, such as the git:// one, is the least preferable
+optional of all, since you will have to enter much more information manually.
+
+If the import is successful, a metadata file will be created. You will need to
+edit this further to check the information, and fill in the blanks.
+
+If it fails, you'll be told why. If it got as far as retrieving the source
+code, you can inspect it further by looking in @code{tmp/importer} where a full
+checkout will exist.
+
+A frequent cause of initial failure is that the project directory is actually
+a subdirectory in the repository. In this case, run the importer again using
+the @code{--subdir} option to tell it where. It will not attempt to determine
+this automatically, since there may be several options.
+
+
+@node Metadata
+@chapter Metadata
+
+@cindex metadata
+
+Information used by update.py to compile the public index comes from two
+sources:
+
+@enumerate
+@item
+the APK files in the repo directory, and
+@item
+the metadata files in the metadata directory.
+@end enumerate
+
+The metadata files are simple, easy to edit text files, always named as the
+application's package ID with '.txt' appended.
+
+Note that although the metadata files are designed to be easily read and
+writable by humans, they are also processed and written by various scripts.
+They are capable of rewriting the entire file when necessary. Even so,
+the structure and comments will be preserved correctly, although the order
+of fields will be standardised. (In the event that the original file was
+in a different order, comments are considered as being attached to the field
+following them). In fact, you can standardise all the metadata in a single
+command, without changing the functional content, by running:
+
+@example
+fdroid rewritemetadata
+@end example
+
+The following sections describe the fields recognised within the file.
+
+@menu
+* Category::
+* License::
+* Name::
+* Web Site::
+* Source Code::
+* Issue Tracker::
+* Donate::
+* FlattrID::
+* Bitcoin::
+* Summary::
+* Description::
+* Repo Type::
+* Repo::
+* Build Version::
+* AntiFeatures::
+* Disabled::
+* Requires Root::
+* Update Check Mode::
+* Auto Update Mode::
+* Current Version::
+* Current Version Code::
+* No Source Since::
+@end menu
+
+@node Category
+@section Category
+
+A single category for the application to be placed in. There is no fixed list
+of categories - both the client and the web site will automatically show any
+categories that exist in any applications. However, if your metadata is
+intended for the main F-Droid repository, you should use one of the existing
+categories (look at the site/client), or discuss the proposal to add
+a new one.
+
+Additional categories can be specified, by using ';' as a separator. In this
+case the first is the primary category, and the only one that will be seen by
+clients that only understand one.
+
+@node License
+@section License
+
+@cindex license
+
+The license for the application.
+
+Common values: 
+
+@itemize @bullet
+
+@item
+@samp{GPLv2}
+GNU GPL version 2
+
+@item
+@samp{GPLv2+}
+GNU GPL version 2 or later
+
+@item
+@samp{GPLv3}
+GNU GPL version 3
+
+@item
+@samp{GPLv3+}
+GNU GPL version 3 or later
+
+@item
+@samp{GPL}
+An unspecified GPL version. Use this only as a last resort.
+
+@item
+@samp{AGPL}
+Afferro GPL version 3.
+
+@item
+@samp{Apache2}
+Apache 2
+
+@item
+@samp{MIT}
+MIT X11 license
+
+@item
+@samp{BSD}
+BSD license - the original '4-clause' version.
+
+@item
+@samp{NewBSD}
+BSD license - the new, or modified, version.
+
+@end itemize
+
+@node Name
+@section Name
+
+@cindex Name
+
+The name of the application. Normally, this field should not be present since the
+application's correct name is retrieved from the APK file. However, in a situation
+where an APK contains a bad or missing application name, it can be overridden
+using this.
+
+@node Web Site
+@section Web Site
+
+@cindex Web Site
+
+The URL for the application's web site.
+
+@node Source Code
+@section Source Code
+
+@cindex Source Code
+
+The URL to view or obtain the application's source code. This should be
+something human-friendly. Machine-readable source-code is covered in the
+'Repo' field.
+
+@node Issue Tracker
+@section Issue Tracker
+
+@cindex Issue Tracker
+
+The URL for the application's issue tracker. Optional, since not all
+applications have one.
+
+@node Donate
+@section Donate
+
+@cindex Donate
+
+The URL to donate to the project. This should be the project's donate page
+if it has one.
+
+It is possible to use a direct PayPal link here, if that is all that is
+available. However, bear in mind that the developer may not be aware of
+that direct link, and if they later changed to a different PayPal account,
+or the PayPal link format changed, things could go wrong. It is always
+best to use a link that the developer explicitly makes public, rather than
+something that is auto-generated 'button code'.
+
+@node FlattrID
+@section FlattrID
+
+@cindex FlattrID
+
+The project's Flattr (http://flattr.com) ID, if it has one. This should be
+a numeric ID, such that (for example) https://flattr.com/thing/xxxx leads
+directly to the page to donate to the project.
+
+@node Bitcoin
+@section Bitcoin
+
+@cindex Bitcoin
+
+A bitcoin address for donating to the project.
+
+@node Summary
+@section Summary
+
+@cindex Summary
+
+A brief summary of what the application is.
+
+@node Description
+@section Description
+
+@cindex Description
+
+A full description of the application. This can span multiple lines (which
+should be kept to a maximum of 80 characters), and is terminated by a line
+containing a single '.'.
+
+Basic MediaWiki-style formatting can be used. Leaving a blank line starts a
+new paragraph. Surrounding text with @code{''} make it italic, and with
+@code{'''} makes it bold.
+
+You can link to another app in the repo by using @code{[[app.id]]}. The link
+will be made appropriately whether in the Android client, the web repo
+browser or the wiki. The link text will be the apps name.
+
+Links to web addresses can be done using @code{[http://example.com Text]}.
+
+Bulletted lists are done by simply starting each item with a @code{*} on
+a new line, and numbered lists are the same but using @code{#}. There is
+currently no support for nesting lists - you can have one level only.
+
+@node Repo Type
+@section Repo Type
+
+@cindex Repo Type
+
+The type of repository - for automatic building from source. If this is not
+specified, automatic building is disabled for this application. Possible
+values are:
+
+@itemize @bullet
+@item
+@samp{git}
+@item
+@samp{svn}
+@item
+@samp{git-svn}
+@item
+@samp{hg}
+@item
+@samp{bzr}
+@item
+@samp{srclib}
+@end itemize
+@node Repo
+@section Repo
+
+@cindex Repo
+
+The repository location. Usually a git: or svn: URL, for example.
+
+The git-svn option connects to an SVN repository, and you specify the URL in
+exactly the same way, but git is used as a back-end. This is preferable for
+performance reasons, and also because a local copy of the entire history is
+available in case the upstream repository disappears. (It happens!). In
+order to use Tags as update check mode for this VCS type, the URL must have
+the tags= special argument set. Likewise, if you intend to use the
+RepoManifest/branch scheme, you would want to specify branches= as well.
+Finally, trunk= can also be added. All these special arguments will be passed
+to "git svn" in order, and their values must be relative paths to the svn repo
+root dir.
+Here's an example of a complex git-svn Repo URL:
+http://svn.code.sf.net/p/project/code/svn;trunk=trunk;tags=tags;branches=branches
+
+For a Subversion repo that requires authentication, you can precede the repo
+URL with username:password@ and those parameters will be passed as @option{--username}
+and @option{--password} to the SVN checkout command. (This works only for
+plain svn and not for git-svn - one of the very few cases where using svn is
+advisable).
+
+
+@node Build Version
+@section Build Version
+
+@cindex Build Version
+
+Any number of these fields can be present, each specifying a version to
+automatically build from source. The value is a comma-separated list.
+For example:
+
+@samp{Build Version:0.12,3,651696a49be2cd7db5ce6a2fa8185e31f9a20035}
+
+The above specifies to build version 0.12, which has a version code of 3.
+The third parameter specifies the tag, commit or revision number from
+which to build it in the source repository.
+
+If the commit version starts with a !, that version is not built. Instead,
+everything after the ! is used as a reason why it can't be built. The
+purpose of this feature is to allow non-buildable releases (e.g. the source
+is not published) to be flagged, so the scripts don't generate repeated
+messages about them. (And also to record the information for review later).
+
+In addition to the three, always required, parameters described above,
+further parameters can be added (in name=value format) to apply further
+configuration to the build. These are:
+
+@table @code
+
+@item subdir=<path>
+Specifies to build from a subdirectory of the checked out source code.
+Normally this directory is changed to before building,
+
+@item bindir=<path>
+Normally the build output (apk) is expected to be in the bin
+subdirectory below the ant build files. If the project is configured
+to put it elsewhere, that can be specified here, relative to the base
+of the checked out repo.
+
+@item oldsdkloc=yes
+The sdk location in the repo is in an old format, or the build.xml is
+expecting such. The 'new' format is sdk.dir while the VERY OLD format
+is sdk-location. Typically, if you get a message along the lines of:
+"com.android.ant.SetupTask cannot be found" when trying to build, then
+try enabling this option.
+
+@item target=<target>
+Specifies a particular SDK target, when the source doesn't. This is
+likely to cause the whole build.xml to be rewritten, which is fine if
+it's a 'standard' android file or doesn't already exist, but not a
+good idea if it's heavily customised.
+
+@item rm=<relpath>
+Specifies the relative path of file to delete before the build is
+done. The path is relative to the base of the build directory - i.e.
+the root of the directory structure checked out from the source
+respository - not necessarily the directory that contains
+AndroidManifest.xml.
+
+Multiple files can be specified by separating they with ';'.
+
+@item antcommand=xxx
+Specify an alternate ant command (target) instead of the default
+'release'.
+
+@item forceversion=yes
+If specified, the package version in AndroidManifest.xml is replaced
+with the version name for the build as specified in the metadata.
+
+This is useful for cases when upstream repo failed to update it for
+specific tag, or to build an arbitrary revision.
+
+@item forcevercode=yes
+If specified, the package version code in the AndroidManifest.xml is
+replaced with the version code for the build. See also forceversion.
+
+@item update=xxx
+By default, 'android update project' is used to generate or update the
+build.xml file. Specifying update=no bypasses that.
+
+Specifiying update=force forces rebuilding of the build.xml file at the
+same time - this is frequently needed with r14 of the Android platform
+tools. Be aware of any customisations in build.xml when using
+update=force.
+
+Otherwise, value can be a semicolon-separated list of directories in
+which to run 'android update project' relative to the main
+application directory (which may include '@code{subdir}' parameter).
+Default value is '@code{.}', and passing non-default value may be
+useful for multi-component projects. Note that @code{--subprojects}
+switch is automatically passed to 'android update project', so using
+explicit list may be needed only for peculiar source layouts.
+
+@item initfun=yes
+Enables a selection of mad hacks to make com.funambol.android build.
+Probably not useful for any other application.
+
+@item buildjni=[yes|no|<dir list>]
+Enables building of native code via the ndk-build script before doing
+the main ant build. The value may be a list of directories relative
+to the main application directory in which to run ndk-build, or 'yes'
+which corresponds to '.' . Using explicit list may be useful to build
+multi-component projects.
+
+The build and scan processes will complain (refuse to build) if this
+parameter is not defined, but there is a @code{jni} directory present.
+If the native code is being built by other means, you can specify
+@code{no} here to avoid that. However, if the native code is actually
+not required, remove the directory instead (using @code{prebuild} for
+example).
+
+@item scanignore=path1;path2;...
+Enables one or more files/paths to be exlcuded from the scan process.
+This should only be used where there is a very good reason, and
+probably accompanied by a comment explaining why it is necessary.
+
+When scanning, files whose relative paths start with any of the paths
+given here are ignored.
+
+@item submodules=yes
+Use if the project (git only) has submodules - causes git submodule
+init and update to be executed after the source is cloned.
+
+@item encoding=xxxx
+Adds a java.encoding property to local.properties with the given
+value. Generally the value will be 'utf-8'. This is picked up by the
+SDK's ant rules, and forces the Java compiler to interpret source
+files with this encoding. If you receive warnings during the compile
+about character encodings, you probably need this.
+
+@item prebuild=xxxx
+Specifies a shell command (or commands - chain with &&) to run before
+the build takes place. Backslash can be used as an escape character to
+insert literal commas, or as the last character on a line to join that
+line with the next. It has no special meaning in other contexts; in
+particular, literal backslashes should not be escaped.
+
+The command runs using bash.
+
+Note that nothing should be build during this prebuild phase - scanning
+of the code and building of the source tarball, for example, take place
+after this. For custom actions that actually build things, use 'build'
+instead.
+
+You can use $$name$$ to substitute the path to a referenced srclib - see
+the @code{srclib} directory for details of this.
+
+You can use $$SDK$$, $$NDK$$ and $$MVN3$$ to substitute the paths to the
+android SDK and NDK directories, and maven 3 executable respectively.
+
+@item init=xxxx
+As for 'prebuild', but runs on the source code BEFORE any other processing
+takes place.
+
+You can use $$SDK$$, $$NDK$$ and $$MVN3$$ to substitute the paths to the
+android SDK and NDK directories, and maven 3 executable respectively.
+
+@item build=xxxx
+As for 'prebuild', but runs during the actual build phase (but before the
+main ant/maven build). Use this only for actions that do actual building.
+Any prepartion of the source code should be done using 'init' or 'prebuild'.
+
+You can use $$SDK$$, $$NDK$$ and $$MVN3$$ to substitute the paths to the
+android SDK and NDK directories, and maven 3 executable respectively.
+
+
+@item novcheck=yes 
+Don't check that the version name and code in the resulting apk are
+correct by looking at the build output - assume the metadata is
+correct. This takes away a useful level of sanity checking, and should
+only be used if the values can't be extracted.
+
+@item fixtrans=yes
+Modifies any instances of string resources that use multiple
+formatting arguments, but don't use positional notation. For example,
+"Hello %s, %d" becomes "Hello %1$s, %2$d". Newer versions of the
+Android platform tools enforce this sensible standard. If you get
+error messages relating to that, you need to enable this.
+
+@item fixapos=yes
+Like fixtrans, but deals with an even older issue relating to
+'unescaped apostrophes' in translation strings.
+
+@item maven=yes
+Build with maven instead of ant
+
+@item patch=x
+Apply patch(es). 'x' names one (or more - comma-seperated)
+files within a directory below the metadata, with the same
+name as the metadata file but without the extension. Each of
+these patches is applied to the code in turn.
+
+@item extlibs=a;b;c
+Specifies a list of external libraries (jar files) from the
+@code{build/extlib} library, which will be placed in the @code{libs} directory
+of the project. Separate items with semicolons.
+
+@item srclibs=a@@r;b@@r1;
+Specifies a list of source libraries (kept up to date using version control)
+from a predefined set. Separate items with semicolons, and each item is of
+the form name@@rev where name is the predefined source library name and rev is
+the revision in source control to use. You can then also use $$name$$ in the
+prebuild command to substitute the relative path to the library directory.
+
+The available source libraries are current hard-coded in common.py. This will
+later be data-driven.
+
+@end table
+
+Another example, using extra parameters:
+
+@samp{Build Version:1.09.03,10903,45,subdir=Timeriffic,oldsdkloc=yes}
+
+@node AntiFeatures
+@section AntiFeatures
+
+@cindex AntiFeatures
+
+This is optional - if present, it contains a comma-separated list of any of
+the following values, describing an AntiFeature the application has:
+
+@itemize @bullet
+
+@item
+@samp{Ads} - the application contains advertising.
+
+@item
+@samp{Tracking} - the application tracks and reports your activity to
+somewhere without your consent.
+
+@item
+@samp{NonFreeNet} - the application promotes a non-Free network service.
+
+@item
+@samp{NonFreeAdd} - the application promotes non-Free add-ons.
+
+@item
+@samp{NonFreeDep} - the application depends on a non-Free application (e.g.
+Google Maps) - i.e. it requires it to be installed on the device, but does not
+include it.
+
+@end itemize
+
+@node Disabled
+@section Disabled
+
+@cindex Disabled
+
+If this field is present, the application does not get put into the public
+index. This allows metadata to be retained while an application is temporarily
+disabled from being published. The value should be a description of why the
+application is disabled.
+
+@node Requires Root
+@section Requires Root
+
+@cindex Requires Root
+
+Set this optional field to "Yes" if the application requires root
+privileges to be usable. This lets the client filter it out if the
+user so desires.
+
+@node Update Check Mode
+@section Update Check Mode
+
+@cindex Update Check Mode
+
+This determines the method using for determining when new releases are
+available - in other words, the updating of the Current Version and Current
+Version Code fields in the metadata by the @code{fdroid checkupdates} process.
+
+Valid modes are:
+
+@itemize
+@item
+@code{None} - No checking is done because there's no appropriate automated way
+of doing so. Updates should be checked for manually.
+@item
+@code{Static} - No checking is done—either development has ceased or new versions
+are not desired. This method is also used when there is no other checking method 
+available and the upstream developer keeps us posted on new versions.
+@item
+@code{RepoManifest} - The AndroidManifest.xml file in the most recent commit
+in the source repository is checked. The appropriateness of this method depends
+on the development process used by the application's developers. You should not
+specify this method unless you're sure it's appropriate. 
+It currently works for every repository type excepting bzr. For git repos, the
+branch used defaults to master. You may specify your own by using
+"RepoManifest/yourbranch" as UCM. The same applies to hg, in which case the
+default value is the "default" branch.
+@item
+@code{Tags} - The AndroidManifest.xml file in all tagged revisions in the
+source repository is checked, looking for the highest version code. The
+appropriateness of this method depends on the development process used by the
+application's developers. You should not specify this method unless you're sure
+it's appropriate. It currently only works for git and git-svn repositories. In 
+the case of the latter, the repo URL must encode the path to the trunk and 
+tags.
+@item
+@code{Market} - This is being phased out and should only be used when the other
+automatic modes don't work.
+@end itemize
+
+@node Auto Update Mode
+@section Auto Update Mode
+
+@cindex Auto Update Mode
+
+This determines the method using for auto-generating new builds new releases are
+available - in other words, adding a new Build Version line to the metadata.
+This happens in conjunction with the 'Update Check Mode' functionality - i.e.
+when an update is detected by that, it is also processed by this.
+
+Valid modes are:
+
+@itemize
+@item
+@code{None} - No auto-updating is done
+@item
+@code{Version} - Identifies the target commit (i.e. tag) for the new build based
+on the given version specification, which is simply text in which %v and %c are
+replaced with the required version name and version code respectively.
+
+For example, if an app always has a tag "2.7.2" corresponding to version 2.7.2,
+you would simply specify "Version %v". If an app always has a tag "ver_1234"
+for a version with version code 1234, you would specify "Version ver_%c".
+
+Additionally, a suffix can be added to the version name at this stage, to
+differentiate F-Droid's build from the original. Continuing the first example
+above, you would specify that as "Version +-fdroid %v" - "-fdroid" is the suffix.
+@end itemize
+
+
+@node Current Version
+@section Current Version
+
+@cindex Current Version
+
+The name of the version that is current. There may be newer versions of the
+application than this (e.g. betas), and there will almost certainly be older
+ones. This should be the one that is recommended for general use.
+
+This field is normally automatically updated - see Update Check Mode.
+
+@node Current Version Code
+@section Current Version Code
+
+@cindex Current Version Code
+
+The version code corresponding to the Current Version field. Both these fields
+must be correct and matching.
+
+This field is normally automatically updated - see Update Check Mode.
+
+@node No Source Since
+@section No Source Since
+
+@cindex No Source Since
+
+In case we are missing the source code for the Current Version reported by
+Upstream, this defines the first version that started missing source code.
+Apps that are missing source code for just one or a few versions, but provide
+source code for newer ones are not to be considered here - this field is
+intended to illustrate which apps do not currently distribute source code, and
+since when have they been doing so.
+
+@node Update Processing
+@chapter Update Processing
+
+@section Detecting
+
+There are various mechanisms in place for automatically detecting that updates
+are available for applications, with the @code{Update Check Mode} field in the
+metadata determining which method is used for a particular application.
+
+Running the @code{fdroid checkupdates} command will apply this method to each
+application in the repository and update the @code{Current Version} and
+@code{Current Version Code} fields in the metadata accordingly.
+
+As usual, the @code{-p} option can be used with this, to restrict processing
+to a particular application.
+
+Note that this only updates the metadata such that we know what the current
+published/recommended version is. It doesn't make that version available in
+the repository - for that, see the next section.
+
+@section Adding
+
+Adding updates (i.e. new versions of applications already included in the
+repository) happens in two ways. The simple case is applications where the
+APK files are binaries, retrieved from a developer's published build. In this
+case, all that's required is to place the new binary in the @code{Repo}
+directory, and the next run of @code{fdroid update} will pick it up.
+
+For applications built from source, it is necessary to add a new
+@code{Build Version} line to the metadata file. At the very least, the version
+name, version code and commit will be different. It is also possible that the
+additional build flags will change between versions.
+
+For processing multiple updates in the metadata at once, it can be useful to
+run @code{fdroid update --interactive}. This will check all the applications
+in the repository, and where updates are required you will be prompted to
+[E]dit the metadata, [I]gnore the update, or [Q]uit altogether.
+
+@node Build Server
+@chapter Build Server
+
+The Build Server system isolates the builds for each package within a clean,
+isolated and secure throwaway virtual machine environment.
+
+@section Overview
+
+Building applications in this manner on a large scale, especially with the
+involvement of automated and/or unattended processes, could be considered
+a dangerous pastime from a security perspective. This is even more the case
+when the products of the build are also distributed widely and in a
+semi-automated ("you have updates available") fashion.
+
+Assume that an upstream source repository is compromised. A small selection
+of things that an attacker could do in such a situation:
+
+@enumerate
+@item
+Use custom ant build steps to execute virtually anything as the user doing
+the build.
+@item
+Access the keystore.
+@item
+Modify the built apk files or source tarballs for other applications in the
+repository.
+@item
+Modify the metadata (which includes build scripts, which again, also includes
+the ability to execute anything) for other applications in the repository.
+@end enumerate
+
+Through complete isolation, the repurcussions are at least limited to the
+application in question. Not only is the build environment fresh for each
+build, and thrown away afterwards, but it is also isolated from the signing
+environment.
+
+Aside from security issues, there are some applications which have strange
+requirements such as custom versions of the NDK. It would be impractical (or
+at least extremely messy) to start modifying and restoring the SDK on a
+multi-purpose system, but within the confines of a throwaway single-use
+virtual machine, anything is possible.
+
+All this is in addition to the obvious advantage of having a standardised
+and completely reproducible environment in which builds are made. Additionally,
+it allows for specialised custom build environments for particular
+applications.
+
+@section Setting up a build server
+
+In addition to the basic setup previously described, you will also need
+a Vagrant-compatible Ubuntu Raring base box called 'raring32' (or raring64
+for a 64-bit VM, if you want it to be much slower, and require more disk
+space).
+
+You can use a different version or distro for the base box, so long as you
+don't expect any help making it work. One thing to be aware of is that
+working copies of source trees are moved from the host to the guest, so
+for example, having subversion v1.6 on the host and v1.7 on the guest
+would fail.
+
+Unless you're very trusting. you should create one of these for yourself
+from verified standard Ubuntu installation media. However, you could skip
+over the next few paragraphs (and sacrifice some security) by downloading 
+@url{https://f-droid.org/raring32.box} or @url{https://f-droid.org/raring64.box}.
+
+Documentation for creating a base box can be found at
+@url{http://docs.vagrantup.com/v1/docs/base_boxes.html}.
+
+In addition to carefully following the steps described there, you should
+consider the following:
+
+@enumerate
+@item
+It is advisable to disable udev network device persistence, otherwise any
+movement of the VM between machines, or reconfiguration, will result in
+broken networking.
+
+For a Debian/Ubuntu default install, just
+@code{touch /etc/udev/rules.d/75-persistent-net-generator.rules} to turn
+off rule generation, and at the same time, get rid of any rules it's
+already created in @code{/etc/udev/rules.d/70-persistent-net.rules}.
+@item
+Unless you want the VM to become totally inaccessible following a failed
+boot, you need to set @code{GRUB_RECORDFAIL_TIMEOUT} to a value other than
+-1 in @code{/etc/grub/default} and then run @code{update-grub}.
+@end enumerate
+
+You may also want to edit @code{buildserver/Vagrantfile} - in particular
+there is a path for retrieving the base box if it doesn't exist, and an
+apt proxy definition, both of which may need customising for your
+environment.
+
+With this base box available, you should then look at the settings at the
+top of @code{makebuildserver.py} and see if any need changing to suit your
+environment. You can then go to the @code{fdroidserver} directory and run
+this:
+
+@example
+./makebuildserver.py
+@end example
+
+This will take a long time, and use a lot of bandwidth - most of it spent
+installing the necessary parts of the Android SDK for all the various
+platforms. Luckily you only need to do it occasionally. Once you have a
+working build server image, if the recipes change (e.g. when packages need
+to be added) you can just run that script again and the existing one will
+be updated in place.
+
+The main sdk/ndk downloads will automatically be cached to speed things
+up the next time, but there's no easy way of doing this for the longer
+sections which use the SDK's @code{android} tool to install platforms,
+add-ons and tools. However, instead of allowing automatic caching, you
+can supply a pre-populated cache directory which includes not only these
+downloads, but also .tar.gz files for all the relevant additions. If the
+provisioning scripts detect these, they will be used in preference to
+running the android tools. For example, if you have
+@code{buildserver/addons/cache/platforms/android-15.tar.gz} that will be
+used when installing the android-15 platform, instead of re-downloading it
+using @code{android update sdk --no-ui -t android-15}.
+
+Once it's complete you'll have a new base box called 'buildserver' which is
+what's used for the actual builds. You can then build packages as normal,
+but with the addition of the @code{--server} flag to @code{fdroid build} to
+instruct it to do all the hard work within the virtual machine.
+
+The first time a build is done, a new virtual machine is created using the
+'buildserver' box as a base. A snapshot of this clean machine state is saved
+for use in future builds, to improve performance. You can force discarding
+of this snapshot and rebuilding from scratch using the @code{--resetserver}
+switch with @code{fdroid build}.
+
+@node Signing
+@chapter Signing
+
+There are two kinds of signing involved in running a repository - the signing
+of the APK files generated from source builds, and the signing of the repo
+index itself. The latter is optional, but very strongly recommended.
+
+@section Repo Index Signing
+
+When setting up the repository, one of the first steps should be to generate
+a signing key for the repository index. This will also create a keystore, which
+is a file that can be used to hold this and all other keys used. Consider the
+location, security and backup status of this file carefully, then create it as
+follows:
+
+@code{keytool -genkey -v -keystore my.keystore -alias repokey -keyalg RSA -keysize 2048 -validity 10000}
+
+In the above, replace 'my.keystore' with the name of the keystore file to be
+created, and 'repokey' with a name to identify the repo index key by.
+
+You'll be asked for a password for the keystore, AND a password for the key.
+They shouldn't be the same. In between, you'll be asked for some identifying
+details which will go in the certificate.
+
+The two passwords entered go into @code{config.py}, as @code{keystorepass} and
+@code{keypass} respectively. The path to the keystore file, and the alias you
+chose for the key also go into that file, as @code{keystore} and
+@code{repo_keyalias} respectively.
+
+@section Package Signing
+
+With the repo index signing configured, all that remains to be done for package
+signing to work is to set the @code{keydname} field in @code{config.py} to
+contain the same identifying details you entered before.
+
+A new key will be generated using these details, for each application that is
+built. (If a specific key is required for a particular application, this system
+can be overridden using the @code{keyaliases} config settings.
+
+
+@node GNU Free Documentation License
+@appendix GNU Free Documentation License
+
+@include fdl.texi
+
+@node Index
+@unnumbered Index
+
+@printindex cp
+
+@bye
