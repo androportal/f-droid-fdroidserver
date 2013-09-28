@@ -13,13 +13,12 @@ System requirement
    <http://dl.google.com/android/ndk/android-ndk-r8e-linux-x86.tar.bz2>`_)
 
 #. Extract it to suitable location on your system. You will use these
-   paths in server configuration.
+   PATH'S in server configuration.
 
 #. ``ant``, ``ant-contrib``, ``maven``, ``javacc``, ``openjdk-6-jdk``,
    any one version control like ``git``.
 
-#. An ``apache`` webserver
-
+#. An ``apache`` webserver.
 
 Cloning this repository
 -----------------------
@@ -27,25 +26,28 @@ Cloning this repository
 #. Clone this repo using::
 
      git clone https://github.com/androportal/f-droid-fdroidserver.git
-
+     
+   Or you can clone the most updated repo from official fdroid repository ::
+     
+     git clone git://gitorious.org/f-droid/fdroidserver.git
 
 Setting system's PATH
 ---------------------
 
 #. Adding ``fdroid`` binary in system's ``$PATH``
 
-   - copy the python script ``fdroid`` from this repository to your
-     system's binary location like ``/usr/bin/`` ::
+   - for example ::
+       
+       export PATH=/path/to/this/repo/:$PATH
 
-       sudo cp -v fdroid /usr/bin
-
-
+   - Or you can add the same line in your ``.bashrc`` file.
+       
 Setting up a repository for apk's
 ---------------------------------
 
-#. Assuming your webserver's `document root` is ``/var/www/``(this is
+#. Assuming your webserver `document root` is ``/var/www/`` (this is
    default in case of Ubuntu), make a directory like
-   ``/var/www/fdroid``.
+   ``/var/www/fdroid`` .
 
    Type ::
 
@@ -54,7 +56,7 @@ Setting up a repository for apk's
    You need to provide your `sudo` password
 
 #. Copy ``config.py`` from this repository to ``/var/www/fdroid``
-   localtion ::
+   location ::
 
      sudo cp -v config.py /var/www/fdroid
 
@@ -78,11 +80,12 @@ Setting up a repository for apk's
    - ``metadata`` will hold all the extra information about apk's
    - ``tmp`` will have apk cache
 
-#. Copy all your apk file to ```/var/www/fdroid/repo`` ::
+#. Copy all your apk file to ``/var/www/fdroid/repo`` ::
 
      sudo cp -v *.apk /var/www/fdroid/repo
 
-#. Your file hirarcy under ``/var/www/fdroid`` should look something like this ::
+#. Your file hierarchy under ``/var/www/fdroid`` should look something
+   like this ::
 
      metadata/
      repo/
@@ -90,12 +93,11 @@ Setting up a repository for apk's
      config.py
      fdroid.icon.png
 
-
 Modifying ``config.py`` file
 ============================
 
 #. Open ``config.py`` from ``/var/www/fdroid/`` and edit it. You can
-   also refer to our config file ``my-config.py``
+   also refer to our sample config file ``my-config.py``
 
 Setting up a keystore
 =====================
@@ -108,18 +110,17 @@ Setting up a keystore
 
    - You need to create a keystore file with the same name and
      location assigned to a variable ``keystore`` in ``config.py``
-     file. For example if our ``keystore`` variable is::
+     file. For example if our ``keystore`` variable is ::
 
-       keystore = "/home/john/fdroid-keystore/my.keystore"
+       keystore = "/home/sachin/fdroid-keystore/my.keystore"
 
-     then, visit that location::
+     then, visit that location ::
        
-       cd /home/john/fdroid-keystore/my.keystore
+       cd /home/sachin/fdroid-keystore/my.keystore
 
      and execute the command ::
 
-       keytool -genkey -v -keystore my.keystore -alias repokey -keyalg
-       RSA -keysize 2048 -validity 10000
+       keytool -genkey -v -keystore my.keystore -alias repokey -keyalg RSA -keysize 2048 -validity 10000
 
    - Provide same values which you have assigned to variable
      ``keydname`` in ``config.py``
@@ -128,10 +129,10 @@ Setting up a keystore
 
    - This should generate a file ``my.keystore`` in present directory
 
-   - Now everyting is in place, visit the location ``/var/www/fdroid``
+   - Now everything is in place, visit the location ``/var/www/fdroid``
      and execute the command ::
 
-       sudo fdroid update -c -v
+       fdroid update -c -v
 
      This should show output similar to screenshot below
    
@@ -140,13 +141,12 @@ Setting up a keystore
 
    - Now run ::
 
-       sudo fdroid update -v
+       fdroid update -v
 
    - and finally ::
 
-       sudo fdroid publish
+       fdroid publish
 
-     
 Configure webserver to server your repo
 ---------------------------------------
 
@@ -156,7 +156,7 @@ Configure webserver to server your repo
 
    assuming you are using an Ubuntu distro
 
-#. Dont forget to give access to web user ::
+#. Don't forget to give access to web user ::
 
      sudo chown -R www-data.www-data /var/www/fdroid
 
@@ -164,12 +164,11 @@ Configure webserver to server your repo
 
      sudo chmod -R 755 /var/www/fdroid
 
-#. Only give root access to ``config.py`` file ::
+#. Give root access to ``config.py`` file ::
 
      sudo chown root.root /var/www/fdroid/config.py
 
      sudo chmod 700 /var/www/fdroid/config.py
-
 
 Testing your repo
 =================
@@ -180,8 +179,10 @@ Testing your repo
 #. If you have any problem, please make sure you have followed all
    above steps correctly OR raise an issue.
 
+Reference
+=========
 
-
-   
-     
+#. A more detailed manual is maintained on official fdroid site
+   `https://f-droid.org/manual/fdroid.html
+   <https://f-droid.org/manual/fdroid.html>`_
 
